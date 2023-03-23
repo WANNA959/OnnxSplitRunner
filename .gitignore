@@ -5,6 +5,9 @@ cuda-drivers
 # model
 *.tar
 *.onnx
+*.bin
+*.param
+*.rknn
 Onnxs/*
 !Onnxs/scripts
 
