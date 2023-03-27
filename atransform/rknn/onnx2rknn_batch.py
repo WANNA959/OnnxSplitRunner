@@ -88,21 +88,24 @@ def trans_batch(onnxDir, rknnDir):
         dirpath = os.path.join(onnxDir, dir)
         if os.path.isfile(dirpath):
             continue
-        tans_single(dirpath, rknnDir)
+        subRknnDir = os.path.join(rknnDir, dir)
+        if not os.path.exists(subRknnDir):
+            os.makedirs(subRknnDir)
+        tans_single(dirpath, subRknnDir)
 
 
 def tans_single(dirpath, rknnDir):
     files = [item for item in os.listdir(dirpath) if "json" in item]
     jsonfile = os.path.join(dirpath, files[0])
+    shutil.copyfile(os.path.join(
+        dirpath, files[0]), os.path.join(rknnDir, files[0]))
     files = [item for item in os.listdir(dirpath) if "onnx" in item]
     onnxfile = os.path.join(dirpath, files[0])
     input_list, input_size_list, output_list = get_input_list(jsonfile)
-    print(input_list)
-    print(input_size_list)
-    print(output_list)
+    # print(input_list)
+    # print(input_size_list)
+    # print(output_list)
     rknnfile = os.path.join(rknnDir, files[0].replace(".onnx", ".rknn"))
-    print(onnxfile)
-    print(rknnfile)
     onnx2rknn(onnxfile, input_list, input_size_list, output_list, rknnfile)
 
 
@@ -111,13 +114,18 @@ if __name__ == '__main__':
     onnxDir = os.path.join(current_path, "../../Onnxs", model_name, "childs")
     print(onnxDir)
 
-    rknnDir = os.path.join(current_path, "models")
+    rknnDir = os.path.join(current_path, "models", model_name)
     if os.path.exists(rknnDir):
         shutil.rmtree(rknnDir)
     os.makedirs(rknnDir)
 
-    # trans_batch(onnxDir, rknnDir)
-    tans_single(
-        "/root/py_project/OnnxSplitRunner/Onnxs/resnet50/childs/0", rknnDir)
-    # tans_single(
-    #     "/root/py_project/OnnxSplitRunner/Onnxs/resnet50/childs/38", rknnDir)
+    trans_batch(onnxDir, rknnDir)
+
+    # tans_single("/root/py_project/OnnxSplitRunner/Onnxs/resnet50/childs/38", rknnDir)
+    # for i in range(10):
+    #     # tans_single(
+    #     #     "/root/py_project/OnnxSplitRunner/Onnxs/resnet50/childs/0", rknnDir)
+    #     path = "/root/py_project/OnnxSplitRunner/Onnxs/resnet50/childs/{}".format(
+    #         i)
+    #     print(path)
+    #     tans_single(path, rknnDir)

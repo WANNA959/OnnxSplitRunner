@@ -13,7 +13,10 @@ for dir in ${childrenPath}/*
 do
     if [ -d $dir ];then
         fileName=`ls $dir | grep onnx | sed -e "s/.onnx//g"`
-        onnx2ncnn $dir/$fileName.onnx $ncnnModelDir/$fileName.param $ncnnModelDir/$fileName.bin
-        rm $ncnnModelDir/$fileName.bin
+        num=${dir##*/}
+        mkdir -p $ncnnModelDir/$num
+        onnx2ncnn $dir/$fileName.onnx $ncnnModelDir/$num/$fileName.param $ncnnModelDir/$num/$fileName.bin
+        cp $dir/$fileName-params.json $ncnnModelDir/$num/$fileName-params.json
+        # rm $ncnnModelDir/$num/$fileName.bin
     fi
 done

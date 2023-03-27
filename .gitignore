@@ -3,6 +3,7 @@
 cuda-drivers
 
 # model
+models
 *.tar
 *.onnx
 *.bin

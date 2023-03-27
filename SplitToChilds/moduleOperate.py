@@ -218,16 +218,17 @@ class ModelAnalyzer():
             json.dump(cache, fp, indent=4)
         print("model analyze ok.")
 
+    # TODO dependencies_inputs vs inputs
     def ExtractModelByNode(self, raw_onnx_path: str, new_onnx_path: str, new_onnx_praram_path: str, start_node: GraphNode, end_node: GraphNode, print_error=True) -> Dict[str, dict]:
         try:
             onnx.utils.extract_model(
-                raw_onnx_path, new_onnx_path, start_node.dependencies_inputs, end_node.dependencies_outputs)
+                raw_onnx_path, new_onnx_path, start_node.inputs, end_node.outputs)
         except onnx.onnx_cpp2py_export.checker.ValidationError:
             params = set()
             for idx in range(start_node.idx, end_node.idx+1):
                 params |= self.nodes[idx].params
             onnx.utils.extract_model(
-                raw_onnx_path, new_onnx_path, start_node.dependencies_inputs+list(params), end_node.dependencies_outputs)
+                raw_onnx_path, new_onnx_path, start_node.inputs+list(params), end_node.outputs)
         except Exception as ex:
             # print(raw_onnx_path,new_onnx_path , start_node.dependencies_inputs, end_node.dependencies_outputs)
             if print_error:
@@ -249,7 +250,6 @@ class ModelAnalyzer():
                 dependency.add(input_name)
 
             for output_name in self.nodes[idx].outputs:
-                # if output_name in dependency:
                 dependency.discard(output_name)
 
             self.nodes[idx].dependencies_inputs = list(dependency)
