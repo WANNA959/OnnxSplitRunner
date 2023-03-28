@@ -9,6 +9,7 @@ import json
 import os
 import time
 from typing import Dict, List
+from queue import Queue
 
 
 class OnnxType:
@@ -48,6 +49,7 @@ class OnnxType:
 
 class GraphNode():
     def __init__(self, node: NodeProto, TotalParams: List[str] = [], index: int = -1):
+        self.plain = node
         self.name = str(node.name)        # type: str
         self.type = str(node.op_type)
 
@@ -69,6 +71,13 @@ class GraphNode():
         self.input_info = {}
         # self.output_info={}           # {"data": [{"type": str, "name": str, "shape": list, "cost": float}], "cost": float}
 
+        self.in_degree = 0
+        self.out_degree = 0
+        self.before = set()
+        self.after = set()
+
+        self.isConvergeNode = False
+
         for input_name in list(node.input):
             if input_name in TotalParams:
                 self.params.add(input_name)
@@ -79,10 +88,13 @@ class GraphNode():
         self.idx = index                  # type: int
 
     def __str__(self) -> str:
-        return "id={}, name={}, inputs={}, outputs={}, dependencies_inputs={}, dependencies_outputs={}, input_info: {}".format(self.idx, self.name, self.inputs, self.outputs, self.dependencies_inputs, self.dependencies_outputs, self.input_info)
+        before = [item.name for item in self.before]
+        after = [item.name for item in self.after]
+        return "id={}, name={}, inputs={}, outputs={}, before={}, after={}, dependencies_inputs={}, dependencies_outputs={}".format(self.idx, self.name, self.inputs, self.outputs, before, after, self.dependencies_inputs, self.dependencies_outputs)
 
-    def IsConvergeNode(self) -> bool:
+    def IsConvergeNode(self,) -> bool:
         return True if len(self.dependencies_inputs) < 2 else False
+
 
 # enable: for node in model_analyzer: ...
 
@@ -116,6 +128,9 @@ class ModelAnalyzer():
 
         self.use_cache = True
 
+        self.data2node = dict()
+        self.node_dict = dict()
+
         if not self.Init():
             return
 
@@ -143,13 +158,15 @@ class ModelAnalyzer():
             # print(model)
             for idx, node in enumerate(model.graph.node):
                 # TODO totalparams
-                self.nodes.append(
-                    GraphNode(node=node, TotalParams=self.params, index=idx))
-
+                graph_node = GraphNode(
+                    node=node, TotalParams=self.params, index=idx)
+                self.nodes.append(graph_node)
+                self.node_dict[node.name] = graph_node
+            self.node_dict["data"] = GraphNode(NodeProto())
             self.RecordDependency()
 
-            for idx, node in enumerate(self.nodes):
-                print(node)
+            # for idx, node in enumerate(self.nodes):
+            #     print(node)
         except Exception as ex:
             print("error: fail to init model-analyzer")
             print(str(ex))
@@ -258,6 +275,73 @@ class ModelAnalyzer():
                 # out=set(self.nodes[idx].dependencies_inputs) | set(self.nodes[idx-1].outputs)
                 # self.nodes[idx-1].dependencies_outputs=list(out)
                 self.nodes[idx-1].dependencies_outputs = self.nodes[idx].dependencies_inputs
+
+    def BuildDependencies(self):
+        self.data2node["data"] = "data"
+
+        for node in self.nodes:
+            node.in_degree = len(node.inputs)
+            node.out_degree = len(node.outputs)
+            for output in node.outputs:
+                self.data2node[output] = node.name
+
+        for node in self.nodes:
+            for input in node.inputs:
+                pre_node_name = self.data2node[input]
+                pre_node = self.node_dict[pre_node_name]
+                # print("pre node name:{} ,node name:{}".format(
+                # pre_node.name, node.name))
+                pre_node.after.add(node)
+                node.before.add(pre_node)
+                # self.node_dict[pre_node_name] = pre_node
+                # self.node_dict[node.name] = node
+
+        # fix data virtual node
+        self.nodes[0].before = list()
+        self.nodes[0].in_degree = 0
+
+        # print(self.data2node)
+        for node in self.nodes:
+            # node = self.node_dict[node.name]
+            print(node)
+
+        # for k, v in self.node_dict.items():
+        #     print(k, v)
+
+    def culTotalDegree(self, node: GraphNode) -> bool:
+        q = Queue()
+        q.put(node)
+        in_total = 0
+        out_total = 0
+        flag = set()
+        while not q.empty():
+            front = q.get()
+            if front.name in flag:
+                continue
+            flag.add(front.name)
+            in_total += len(front.before)
+            out_total += len(front.after)
+            for pre in front.before:
+                q.put(pre)
+        print(node.name, in_total, out_total-node.out_degree)
+        return in_total == out_total-node.out_degree
+
+    def checkConverageNode(self, node: GraphNode) -> bool:
+        if len(node.after) != 1:
+            return False
+        tmp = list(node.after)
+        next_node = self.node_dict[tmp[0].name]
+        if len(next_node.before) != 1:
+            return False
+        return self.culTotalDegree(node)
+
+    def GetConverageNodes(self) -> List[GraphNode]:
+        converageNodes = list()
+        for node in self.nodes:
+            if self.checkConverageNode(node):
+                node.isConvergeNode = True
+                converageNodes.append(node)
+        return converageNodes
 
     def SplitAndStoreChilds(self, childs: List[GraphNode]) -> dict:
         '''
@@ -396,13 +480,6 @@ class ModelAnalyzer():
             with open(params_path, "w") as fp:
                 json.dump(params_dict, fp, indent=4)
         return params_dict
-
-    def GetConvergeNodes(self) -> List[GraphNode]:
-        result = []
-        for node in self.nodes:
-            if node.IsConvergeNode():
-                result.append(node)
-        return result
 
     def GetAllNodes(self) -> List[GraphNode]:
         return self.nodes

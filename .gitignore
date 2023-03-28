@@ -11,6 +11,7 @@ models
 *.rknn
 Onnxs/*
 !Onnxs/scripts
+!Onnxs/test
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

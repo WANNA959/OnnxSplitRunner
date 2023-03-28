@@ -23,7 +23,7 @@ def gen_random_inputs(jsonpath: str) -> list():
 def run_batch_rknn(rknnDir: str):
     dirs = os.listdir(rknnDir)
     dirs = [dir for dir in dirs if os.path.isdir(os.path.join(rknnDir, dir))]
-    for idx in range(150, len(dirs)):
+    for idx in range(147, len(dirs)):
         subRknnDir = os.path.join(rknnDir, str(idx))
         run_single_rknn(subRknnDir)
 
@@ -58,7 +58,8 @@ def run_single_rknn(rknnDir: str):
 
     # Inference
     print('--> Running model')
-    outputs = rknn.inference(inputs=inputs)
+    # outputs = rknn.inference(inputs=inputs, data_format="nchw")
+    outputs = rknn.inference(inputs=inputs, data_format="nhwc")
     x = outputs[0]
     output = np.exp(x)/np.sum(np.exp(x))
     outputs = [output]

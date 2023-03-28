@@ -2,6 +2,7 @@
 
 from config import Config
 import torch
+import torch.onnx
 import torchvision
 import sys
 from SplitToChilds.support import SupportedModels
